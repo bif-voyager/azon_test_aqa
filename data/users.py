@@ -1,7 +1,5 @@
-# data/users.py
-from tests.conftest import authenticated_user
 from utils.data_generator import DataGenerator
-
+from config.credentials import ADMIN_INVITE_CODE, MANAGER_INVITE_CODE
 
 class UserData:
     """Object Mother для тел запросов Auth API."""
@@ -24,4 +22,22 @@ class UserData:
 
     @staticmethod
     def change_password_data(user_data, new_password) -> dict:
-        return {"old_password": user_data["password"], "password": new_password}
+        return {"old_password": user_data["password"], "new_password": new_password}
+
+    @staticmethod
+    def registration_data_admin() -> dict:
+        return {
+            "email": DataGenerator.generate_email(),
+            "password": DataGenerator.generate_password(),
+            "full_name": DataGenerator.generate_full_name(),
+            "invite_code": ADMIN_INVITE_CODE
+        }
+
+    @staticmethod
+    def registration_data_manager() -> dict:
+        return {
+            "email": DataGenerator.generate_email(),
+            "password": DataGenerator.generate_password(),
+            "full_name": DataGenerator.generate_full_name(),
+            "invite_code": MANAGER_INVITE_CODE
+        }
