@@ -174,7 +174,51 @@ class TestProducts:
             "price": 0
         }
 
-        response = api_manager.products_api.update_price(product_id, payload, expected_status=422)
+        response = api_manager.products_api.update_price(
+            product_id, payload, expected_status=422
+        )
         details = response.json()["detail"]
 
         assert any(error["loc"][-1] == "price" for error in details)
+
+    def test_get_products_item_id(self, api_manager, created_product):
+        params = {
+            "category_id": created_product["category_id"]
+        }
+        response = api_manager.products_api.get_products(
+            params=params, expected_status=200
+        )
+
+        products = response.json()["items"]
+
+        assert products
+        for product in products:
+            assert product["category_id"] == created_product["category_id"]
+
+    def test_get_products_returns_different_pages(self, api_manager):
+        page_size = 2
+
+        first_response = api_manager.products_api.get_products(
+            params={"page": 1, "size": page_size},
+        )
+
+        second_response = api_manager.products_api.get_products(
+            params={"page": 2, "size": page_size},
+        )
+
+        first_data = first_response.json()
+        second_data = second_response.json()
+        first_items = first_data["items"]
+        second_items = second_data["items"]
+
+        assert first_data["total"] > page_size
+        assert len(first_items) <= page_size
+        assert len(second_items) <= page_size
+
+        first_ids = {product["id"] for product in first_items}
+        second_ids = {product["id"] for product in second_items}
+
+        assert first_ids.isdisjoint(second_ids)
+
+
+    def
