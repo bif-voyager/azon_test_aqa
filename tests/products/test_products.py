@@ -219,6 +219,3 @@ class TestProducts:
         second_ids = {product["id"] for product in second_items}
 
         assert first_ids.isdisjoint(second_ids)
-
-
-    def
