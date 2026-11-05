@@ -24,3 +24,23 @@ class DataGenerator:
     @staticmethod
     def generate_phone():
         return fake.phone()
+
+    @staticmethod
+    def generate_sku():
+        return uuid.uuid4().hex
+
+    @staticmethod
+    def generate_description():
+        return fake.sentence()
+
+    @staticmethod
+    def generate_price() -> int:
+        return fake.random_int(min=100, max=50000)
+
+    @staticmethod
+    def generate_stock() -> int:
+        return fake.random_int(min=10, max=100)
+
+    @staticmethod
+    def generate_uuid():
+        return uuid.uuid4().hex
