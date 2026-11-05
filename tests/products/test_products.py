@@ -6,6 +6,7 @@ from venv import create
 from wsgiref.util import application_uri
 import uuid
 from utils.data_generator import DataGenerator
+from data.products import ProductData
 
 class TestProducts:
 
@@ -43,14 +44,7 @@ class TestProducts:
         assert response.json()["error"]["code"] == "PRODUCT_NOT_FOUND"
 
     def test_create_product(self, api_manager, authenticated_admin):
-        payload = {
-            "name": DataGenerator.generate_full_name(),
-            "sku": DataGenerator.generate_sku(),
-            "description": DataGenerator.generate_description(),
-            "price": DataGenerator.generate_price(),
-            "stock": DataGenerator.generate_stock(),
-            "category_id": api_manager.categories_api.get_categories().json()[0]["id"]
-        }
+        payload = ProductData.create_product_data(api_manager.categories_api.get_categories().json()[0]["id"])
 
         response = api_manager.products_api.create_product(payload=payload, expected_status=201)
 
@@ -91,68 +85,56 @@ class TestProducts:
         assert response.json()["description"] == created_product["description"]
         assert price_decimal == payload["price"]
 
-    def test_delete_product(self, api_manager, authenticated_admin):
-        payload = {
-            "name": DataGenerator.generate_full_name(),
-            "sku": DataGenerator.generate_sku(),
-            "description": DataGenerator.generate_description(),
-            "price": DataGenerator.generate_price(),
-            "stock": DataGenerator.generate_stock(),
-            "category_id": api_manager.categories_api.get_categories().json()[0]["id"]
-        }
-
-        response_create = api_manager.products_api.create_product(
-            payload=payload, expected_status=201
-        )
-        product_id = response_create.json()["id"]
+    def test_delete_product(self, api_manager, created_product, public_api_manager):
+        product_id = created_product["id"]
         response_delete = api_manager.products_api.delete_product(
-            response_create.json()["id"]
+            created_product["id"]
         )
-        deleted_product_response = api_manager.products_api.get_product(
+
+        admin_product_response = api_manager.products_api.get_product(
             product_id,
             expected_status=200,
         )
 
-        assert deleted_product_response.json()["id"] == product_id
-        assert deleted_product_response.json()["is_available"] is False
+        assert admin_product_response.json()["is_available"] is False
+
+        deleted_product_response = public_api_manager.products_api.get_product(
+            product_id,
+            expected_status=404
+        )
+
+        assert deleted_product_response.json()["error"]["code"] == "PRODUCT_NOT_FOUND"
+
+        page = 1
+        while True:
+            products_response = public_api_manager.products_api.get_products(params={"page": page, "size": 100}, expected_status=200)
+            products_data = products_response.json()
+            products_list = products_data["items"]
+
+            assert products_data["page"] == page
+            assert all(product["id"] != product_id for product in products_list)
+
+            if page >= products_data["pages"]:
+                break
+            page += 1
 
     def test_user_cannot_create_product(self, api_manager, authenticated_user):
-        payload = {
-            "name": DataGenerator.generate_full_name(),
-            "sku": DataGenerator.generate_sku(),
-            "description": DataGenerator.generate_description(),
-            "price": DataGenerator.generate_price(),
-            "stock": DataGenerator.generate_stock(),
-            "category_id": api_manager.categories_api.get_categories().json()[0]["id"]
-        }
+        payload = ProductData.create_product_data(api_manager.categories_api.get_categories().json()[0]["id"])
 
         response = api_manager.products_api.create_product(payload=payload, expected_status=403)
 
         assert response.json()["error"]["code"] == "FORBIDDEN"
 
     def test_token_missing_create_product(self, api_manager):
-        payload = {
-            "name": DataGenerator.generate_full_name(),
-            "sku": DataGenerator.generate_sku(),
-            "description": DataGenerator.generate_description(),
-            "price": DataGenerator.generate_price(),
-            "stock": DataGenerator.generate_stock(),
-            "category_id": api_manager.categories_api.get_categories().json()[0]["id"]
-        }
+        payload = ProductData.create_product_data(api_manager.categories_api.get_categories().json()[0]["id"])
 
         response = api_manager.products_api.create_product(payload=payload, expected_status=401)
 
         assert response.json()["error"]["code"] == "TOKEN_MISSING"
 
     def test_exist_sku_create_product(self, api_manager, created_product):
-        payload = {
-            "name": DataGenerator.generate_full_name(),
-            "sku": created_product["sku"],
-            "description": DataGenerator.generate_description(),
-            "price": DataGenerator.generate_price(),
-            "stock": DataGenerator.generate_stock(),
-            "category_id": api_manager.categories_api.get_categories().json()[0]["id"]
-        }
+        payload = ProductData.create_product_data(api_manager.categories_api.get_categories().json()[0]["id"])
+        payload["sku"] = created_product["sku"]
 
         response = api_manager.products_api.create_product(payload=payload, expected_status=409)
 
@@ -211,9 +193,11 @@ class TestProducts:
         first_items = first_data["items"]
         second_items = second_data["items"]
 
-        assert first_data["total"] > page_size
-        assert len(first_items) <= page_size
-        assert len(second_items) <= page_size
+        assert first_data["total"] >= page_size * 2
+        assert first_data["page"] == 1
+        assert second_data["page"] == 2
+        assert len(first_items) == page_size
+        assert len(second_items) == page_size
 
         first_ids = {product["id"] for product in first_items}
         second_ids = {product["id"] for product in second_items}

@@ -4,7 +4,7 @@ import requests
 from api.api_manager import ApiManager
 from api.categories_api import CategoriesAPI
 from data.users import UserData
-from utils.data_generator import DataGenerator
+from data.products import ProductData
 
 
 @pytest.fixture(scope="session")
@@ -69,14 +69,9 @@ def authenticated_manager(api_manager):
 
 @pytest.fixture
 def created_product(api_manager, authenticated_admin):
-    payload = {
-            "name": DataGenerator.generate_full_name(),
-            "sku": DataGenerator.generate_sku(),
-            "description": DataGenerator.generate_description(),
-            "price": 49999.9,
-            "stock": 100,
-            "category_id": api_manager.categories_api.get_categories().json()[0]["id"]
-    }
+    payload = ProductData.create_product_data(api_manager.categories_api.get_categories().json()[0]["id"])
+    payload["price"] = 49999.9
+    payload["stock"] = 100
 
     response = api_manager.products_api.create_product(payload=payload, expected_status=201)
 
@@ -84,4 +79,18 @@ def created_product(api_manager, authenticated_admin):
 
     yield created_product_data
 
-    api_manager.products_api.delete_product(created_product_data["id"])
+    product_response = api_manager.products_api.get_product(
+        created_product_data["id"],
+        expected_status=200,
+    )
+
+    if product_response.json()["is_available"] is True:
+        api_manager.products_api.delete_product(created_product_data["id"])
+
+@pytest.fixture
+def public_api_manager():
+    session = requests.Session()
+
+    yield ApiManager(session)
+
+    session.close()
